@@ -190,7 +190,7 @@ fun String.customFormat() : String {
     lPart.reversed().forEachIndexed{i, ch ->
         if (i % 3 == 0 && i != 0)
             finalResult += " "
-            finalResult += ch
+        finalResult += ch
     }
     return finalResult.reversed() + rPart
 }
