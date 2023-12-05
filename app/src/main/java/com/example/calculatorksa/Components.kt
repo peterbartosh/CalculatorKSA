@@ -31,15 +31,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.math.BigDecimal
-import java.math.MathContext
 import java.math.RoundingMode
+import kotlin.math.pow
 
 @Composable
 fun RoundOptions(pickedOptionState: MutableState<Int>) {
@@ -169,7 +168,7 @@ fun MyTextField(
             },
         enabled = enabled,
         singleLine = true,
-        textStyle = TextStyle(
+        textStyle = androidx.compose.ui.text.TextStyle(
             color = if (numberState.value.isEmpty()) Color.LightGray else Color.Black,
             fontSize = if (numberState.value.isEmpty()) 20.sp else 25.sp,
             textAlign = TextAlign.Center
@@ -195,6 +194,9 @@ fun String.customFormat() : String {
     return finalResult.reversed() + rPart
 }
 
+fun String.removeWhitespaces() = this.filter { !it.isWhitespace() }
+
+
 fun onResultClick(
     context: Context,
     firstNumberState: MutableState<String>,
@@ -204,8 +206,7 @@ fun onResultClick(
     operationInd12State: MutableState<Int>,
     operationInd23State: MutableState<Int>,
     operationInd34State: MutableState<Int>,
-    calculatedValueState: MutableState<String>,
-    roundOptionState: MutableState<Int>
+    calculatedValueState: MutableState<String>
 ){
     try {
 
@@ -226,8 +227,8 @@ fun onResultClick(
         iPart1
             .reversed()
             .forEachIndexed{ ind, ch ->
-                if (!ch.isDigit() && ch != ' ')
-                    throw NumberFormatException("")
+                if (!ch.isDigit() && ch != ' ' && ch != '-')
+                    throw NumberFormatException("aaa")
                 if (ch == ' ') {
                     if ((ind - offset1) % 3 != 0)
                         throw NumberFormatException("")
@@ -245,7 +246,7 @@ fun onResultClick(
         iPart2
             .reversed()
             .forEachIndexed{ ind, ch ->
-                if (!ch.isDigit() && ch != ' ')
+                if (!ch.isDigit() && ch != ' ' && ch != '-')
                     throw NumberFormatException("")
                 if (ch == ' ') {
                     if ((ind - offset2) % 3 != 0)
@@ -264,7 +265,7 @@ fun onResultClick(
         iPart3
             .reversed()
             .forEachIndexed{ ind, ch ->
-                if (!ch.isDigit() && ch != ' ')
+                if (!ch.isDigit() && ch != ' ' && ch != '-')
                     throw NumberFormatException("")
                 if (ch == ' ') {
                     if ((ind - offset2) % 3 != 0)
@@ -283,7 +284,7 @@ fun onResultClick(
         iPart4
             .reversed()
             .forEachIndexed{ ind, ch ->
-                if (!ch.isDigit() && ch != ' ')
+                if (!ch.isDigit() && ch != ' ' && ch != '-')
                     throw NumberFormatException("")
                 if (ch == ' ') {
                     if ((ind - offset2) % 3 != 0)
@@ -310,7 +311,7 @@ fun onResultClick(
             0 -> second.plus(third)
             1 -> second.minus(third)
             2 -> second.multiply(third)
-            3 -> second.divide(third, 10, RoundingMode.HALF_DOWN)
+            3 -> second.divide(third, 10, RoundingMode.HALF_UP)
             else -> BigDecimal(0)
         }
 
@@ -320,7 +321,7 @@ fun onResultClick(
         val resultNext = if (operationInd12State.value in listOf(2, 3)) {
             when (operationInd12State.value) {
                 2 -> first.multiply(result23)
-                3 -> first.divide(result23, 10, RoundingMode.HALF_DOWN)
+                3 -> first.divide(result23, 10, RoundingMode.HALF_UP)
                 else -> BigDecimal(0)
             }
         }
@@ -330,15 +331,9 @@ fun onResultClick(
                 0 -> result23.plus(fourth)
                 1 -> result23.minus(fourth)
                 2 -> result23.multiply(fourth)
-                3 -> result23.divide(fourth, 10, RoundingMode.HALF_DOWN)
+                3 -> result23.divide(fourth, 10, RoundingMode.HALF_UP)
                 else -> BigDecimal(0)
             }
-        }
-
-        val roundingMode = when (roundOptionState.value){
-            0 -> RoundingMode.HALF_DOWN
-            2 -> RoundingMode.DOWN
-            else -> RoundingMode.HALF_EVEN
         }
 
         val result = if (priorInd == 0){
@@ -346,7 +341,7 @@ fun onResultClick(
                 0 -> resultNext.plus(fourth)
                 1 -> resultNext.minus(fourth)
                 2 -> resultNext.multiply(fourth)
-                3 -> resultNext.divide(fourth, 10, roundingMode)
+                3 -> resultNext.divide(fourth, 10, RoundingMode.HALF_UP)
                 else -> BigDecimal(0)
             }
         } else {
@@ -354,12 +349,12 @@ fun onResultClick(
                 0 -> first.plus(resultNext)
                 1 -> first.minus(resultNext)
                 2 -> first.multiply(resultNext)
-                3 -> first.divide(resultNext, 10, roundingMode)
+                3 -> first.divide(resultNext, 10, RoundingMode.HALF_UP)
                 else -> BigDecimal(0)
             }
         }
 
-
+        Log.d(TAG, "result = $result")
 
         val isOverflow = listOf(first, second, third, fourth, result)
             .any { it !in (BigDecimal(-1000000000000.000000)..BigDecimal(1000000000000.000000)) }
@@ -369,25 +364,31 @@ fun onResultClick(
         else {
 
             if (result.toString().find { it == '.' } == null){
-                calculatedValueState.value = result.toString().customFormat()
+                if (result.toString().contains("E")) {
+                    val value = result.toString().takeWhile { it != 'E' }.replace(".", "")
+                    val deg = result.toString().split("E").last().replace("-","").toInt()
+                    if (deg > 10)
+                        Toast.makeText(context, "Error.\nOverflow", Toast.LENGTH_SHORT).show()
+                    val div = "0".repeat(deg - 1) + value
+                    Log.d(TAG, "casdcv: $value $deg $div")
+                    calculatedValueState.value = div
+                } else
+                    calculatedValueState.value = result.toString().customFormat()
                 return
             }
             var ind = -1
             val rPartRes = result.toString().split(".").last()
             val iPartRes = result.toString().split(".").first()
-            rPartRes.forEachIndexed{ i, ch ->
+            rPartRes.forEachIndexed { i, ch ->
                 if (ch != '0') ind = i
             }
 
             Log.d(TAG, "onCreate: $iPartRes $rPartRes $ind")
 
-            if (ind != -1)
-                calculatedValueState.value =
-                    result.toString().substring(0, iPartRes.length + 1 + ind + 1).customFormat()
+            calculatedValueState.value  = if (ind != -1)
+                result.toString().substring(0, iPartRes.length + 1 + ind + 1).customFormat()
             else
-                calculatedValueState.value = iPartRes.customFormat()
-
-
+                iPartRes.customFormat()
         }
 
         Log.d(TAG, "onCreate: 3")
@@ -395,7 +396,7 @@ fun onResultClick(
     } catch (nfe: NumberFormatException) {
         Toast.makeText(
             context,
-            "Error.\nIncorrect input",
+            "Error.\nIncorrect input" + nfe.message,
             Toast.LENGTH_SHORT
         ).show()
     } catch (ae : ArithmeticException){

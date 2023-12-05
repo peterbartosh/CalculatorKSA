@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.calculatorksa.ui.theme.CalculatorKSATheme
 import java.math.BigDecimal
+import java.math.BigInteger
+import java.math.MathContext
 import java.math.RoundingMode
 
 const val TAG = "CALCULATOR_TAG"
@@ -91,9 +93,30 @@ class MainActivity : ComponentActivity() {
                         mutableStateOf(0)
                     }
 
-                    val calculatedIntValueState = remember(calculatedValueState.value) {
+                    val calculatedIntValueState = remember(calculatedValueState.value, pickedRoundOptionState.value) {
                         val value = try {
-                            calculatedValueState.value.toBigDecimal().toInt().toString()
+                            val parts = calculatedValueState.value.removeWhitespaces().split(".")
+                            val iPart = parts[0]
+                            val rPart = if (parts.size > 1) parts[1] else "0"
+                            Log.d(TAG, "onCreateeeee: $iPart : $rPart")
+                            if (rPart == "0") iPart
+                            else when (pickedRoundOptionState.value){
+                                0 -> calculatedValueState.value
+                                    .removeWhitespaces()
+                                    .toBigDecimal()
+                                    .round(MathContext(iPart.length, RoundingMode.HALF_UP))
+                                    .toPlainString().customFormat()
+                                1 -> if (iPart.last().digitToInt() % 2 == 0) iPart.customFormat() else iPart.toBigInteger().plus(
+                                    BigInteger("1")
+                                ).toString().customFormat()
+                                2 -> calculatedValueState.value
+                                    .removeWhitespaces()
+                                    .toBigDecimal()
+                                    .round(MathContext(iPart.length, RoundingMode.DOWN))
+                                    .toPlainString().customFormat()
+                                else -> ""
+                            }
+
                         } catch (e : Exception) { "0" }
                         mutableStateOf(value)
                     }
@@ -166,8 +189,7 @@ class MainActivity : ComponentActivity() {
                                         context,
                                         firstNumberState, secondNumberState, thirdNumberState, fourthNumberState,
                                         operationInd12State, operationInd23State, operationInd34State,
-                                        calculatedValueState,
-                                        pickedRoundOptionState
+                                        calculatedValueState
                                     )
                                 },
                                 contentPadding = PaddingValues(5.dp)
